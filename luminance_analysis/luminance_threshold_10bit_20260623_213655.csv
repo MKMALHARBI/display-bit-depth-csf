@@ -1,0 +1,2 @@
+patch_number,mode,monitor_name,resolution,refresh_rate,brightness,gamma_r,gamma_g,gamma_b,fb_red_bits,fb_green_bits,fb_blue_bits,value,target_float,base_code,frac,measurement_1,measurement_2,measurement_3,mean
+1,threshold_10bit,DP-2,3840x2160,unknown,1.0,1.0,1.0,1.0,10,10,10,510.87,0.499389,127,0.344195,76.5,76.4,76.4,76.43333333333334

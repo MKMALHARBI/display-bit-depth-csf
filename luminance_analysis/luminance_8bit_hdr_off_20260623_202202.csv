@@ -1,0 +1,8 @@
+patch_number,mode,monitor_name,resolution,refresh_rate,brightness,gamma_r,gamma_g,gamma_b,fb_red_bits,fb_green_bits,fb_blue_bits,value,target_float,base_code,frac,measurement_1,measurement_2,measurement_3,mean
+1,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,0,0.000000,0,0.000000,0.4,0.4,0.4,0.4000000000000001
+2,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,126,0.494118,126,0.000000,85.2,85.3,85.3,85.26666666666667
+3,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,127,0.498039,127,0.000000,86.3,86.4,86.3,86.33333333333333
+4,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,128,0.501961,128,0.000000,87.5,87.4,87.1,87.33333333333333
+5,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,129,0.505882,129,0.000000,88.3,88.3,88.3,88.3
+6,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,130,0.509804,130,0.000000,90.0,89.9,90.0,89.96666666666665
+7,8bit_hdr_off,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,255,1.000000,255,0.000000,431.2,430.8,430.4,430.8

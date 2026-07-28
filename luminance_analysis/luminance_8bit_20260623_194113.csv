@@ -1,0 +1,8 @@
+patch_number,mode,monitor_name,resolution,refresh_rate,brightness,gamma_r,gamma_g,gamma_b,fb_red_bits,fb_green_bits,fb_blue_bits,value,target_float,base_code,frac,measurement_1,measurement_2,measurement_3,mean
+1,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,0,0.000000,0,0.000000,0.4,0.4,0.4,0.4000000000000001
+2,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,126,0.494118,126,0.000000,71.0,71.0,70.9,70.96666666666667
+3,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,127,0.498039,127,0.000000,72.9,73.0,72.8,72.89999999999999
+4,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,128,0.501961,128,0.000000,75.1,74.9,75.2,75.06666666666666
+5,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,129,0.505882,129,0.000000,76.5,76.3,76.7,76.5
+6,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,130,0.509804,130,0.000000,78.9,78.9,78.8,78.86666666666667
+7,8bit,DP-2,3840x2160,unknown,0.38,unknown,unknown,unknown,8,8,8,255,1.000000,255,0.000000,434.4,433.0,435.2,434.2
