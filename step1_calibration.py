@@ -211,8 +211,7 @@ def run_quest_calibration():
 
             # 10-bit: direct float gray level on mid-gray background
             # Letter appears at GRAY + contrast/255 (same physical delta as original)
-            letter_gray = float(GRAY + contrast / 255.0)
-
+            letter_delta = float(contrast / 255.0)
             # Show stimulus
             n_frames = int(params['stim_duration'] * FPS)
             for frame in range(n_frames):
@@ -227,7 +226,8 @@ def run_quest_calibration():
 
                 # Draw letter slightly brighter than background
                 renderer.draw_text_centered(font_stim, correct_letter,
-                                            frame_cx, frame_cy, font_size, letter_gray)
+                                            frame_cx, frame_cy, font_size, letter_delta,
+                                            additive=True)
 
                 draw_top_gradient()
                 renderer.flip()

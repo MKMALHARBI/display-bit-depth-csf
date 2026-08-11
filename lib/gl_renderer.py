@@ -367,8 +367,20 @@ class GLRenderer:
                 max_descent = descent
         return total_w, max_ascent + max_descent, max_ascent
 
-    def draw_text(self, font_path, text, x, y, size, gray):
-        """Draw text at (x, y) baseline position with given gray level."""
+    def draw_text(self, font_path, text, x, y, size, gray, additive=False):
+        """Draw text at (x, y) baseline position with given gray level.
+
+        additive=False (default): normal alpha blend, result = a*gray + (1-a)*dst.
+        Correct for UI text, and for a stimulus on a uniform background.
+
+        additive=True: GL_SRC_ALPHA/GL_ONE, result = dst + a*gray. Here `gray` is the
+        luminance INCREMENT over the background, not an absolute level. Needed when the
+        background varies (a noise field): the alpha blend pulls each pixel toward `gray`
+        from whatever is underneath, so at full coverage it REPLACES the noise instead of
+        riding on it. Additive keeps the increment exactly a*gray whatever lies beneath.
+        """
+        if additive:
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glUseProgram(self._prog_glyph)
         glUniform2f(glGetUniformLocation(self._prog_glyph, "uResolution"),
                     self.width, self.height)
@@ -389,12 +401,15 @@ class GLRenderer:
             self._draw_quad()
             cursor_x += g['advance']
 
-    def draw_text_centered(self, font_path, text, cx, cy, size, gray):
+        if additive:
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)   # restore renderer default
+
+    def draw_text_centered(self, font_path, text, cx, cy, size, gray, additive=False):
         """Draw text centered at (cx, cy) pixel coordinates."""
         tw, th, ascent = self.measure_text(font_path, text, size)
         x = cx - tw // 2
         y = cy + ascent - th // 2  # baseline so glyph bbox is centered on cy
-        self.draw_text(font_path, text, x, y, size, gray)
+        self.draw_text(font_path, text, x, y, size, gray, additive=additive)
 
     # ------------------------------------------------------------------
     # Noise texture

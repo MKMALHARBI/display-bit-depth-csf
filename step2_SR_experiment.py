@@ -135,9 +135,8 @@ def run_main_experiment():
 
     # 10-bit: direct float gray level, no dithering needed
     letter_contrast = np.clip(letter_contrast, 0.0001, 255.0)
-    gray_level = float(letter_contrast / 255.0)
-
-    print(f"Letter contrast: {letter_contrast:.4f} (gray_level={gray_level:.6f})")
+    letter_delta = float(letter_contrast / 255.0)
+    print(f"Letter contrast: {letter_contrast:.4f} (letter_delta={letter_delta:.6f})")
 
     # Create trial list
     letters = params['letters']
@@ -229,19 +228,22 @@ def run_main_experiment():
 
                 renderer.clear(GRAY)
 
-                # Black stimulus area with white outline
-                renderer.draw_rect_filled(frame_x, frame_y, frame_size[0], frame_size[1], BLACK)
+                # Noise field replaces the mid-gray inside the frame, drawn BEFORE the
+                # letter so the letter composites onto it. At noise_level 0 the field is
+                # flat mid-gray -- what clear(GRAY) already put there -- so it is skipped.
+                if noise_level > 0:
+                    noise_idx = noise_order[frame % len(noise_order)]
+                    renderer.draw_noise_texture(noise_tex_ids[noise_idx],
+                                                frame_x, frame_y,
+                                                frame_size[0], frame_size[1],
+                                                additive=False)
+
                 renderer.draw_rect_outline(frame_x, frame_y, frame_size[0], frame_size[1], WHITE, 2)
 
-                # Draw letter at precise gray level
+                # Letter added as an increment over whatever is beneath, so it rides on
+                # the noise instead of replacing it. Identical to step1_calibration.py.
                 renderer.draw_text_centered(font_stim, target_letter,
-                                            frame_cx, frame_cy, font_size, gray_level)
-
-                # Additive noise/gray overlay (GL_ONE, GL_ONE replicates BLEND_ADD)
-                noise_idx = noise_order[frame % len(noise_order)]
-                renderer.draw_noise_texture(noise_tex_ids[noise_idx],
-                                            frame_x, frame_y,
-                                            frame_size[0], frame_size[1],
+                                            frame_cx, frame_cy, font_size, letter_delta,
                                             additive=True)
 
                 draw_top_gradient()

@@ -49,16 +49,36 @@ def get_display_info():
                 if bright_match:
                     current_display['brightness'] = float(bright_match.group(1))
 
-                mode_match = re.search(r'(\d+\.\d+)Hz', line)
-                if mode_match and 'refresh_rate' not in current_display:
-                    if '*current' in line:
-                        current_display['refresh_rate'] = float(mode_match.group(1))
+                # Refresh rate spans two lines of `xrandr --verbose`:
+                #
+                #   3840x2160 (0x23) 1496.750MHz ... *current +preferred
+                #         v: height 2160 start ... clock  119.86Hz
+                #
+                # The header carries *current but its only frequency is the pixel
+                # clock in MHz; the vertical-timing line carries the actual refresh
+                # but not *current. Requiring both on one line (as this did before)
+                # can never match, so refresh_rate stayed unset and callers silently
+                # fell back to 60 Hz -- halving stimulus duration on a 120 Hz panel.
+                # Mark the current mode, then read the v: line that follows it.
+                if '*current' in line:
+                    current_display['_in_current_mode'] = True
+                elif current_display.get('_in_current_mode'):
+                    # The h: line sits between, so hold the flag until v: is seen.
+                    v_match = re.match(r'\s*v:.*?clock\s+([\d.]+)Hz', line)
+                    if v_match:
+                        rate = float(v_match.group(1))
+                        if 20.0 <= rate <= 400.0:
+                            current_display['refresh_rate'] = rate
+                        current_display.pop('_in_current_mode', None)
 
         if current_display:
             displays.append(current_display)
 
     except Exception as e:
         print(f"Error getting display info: {e}")
+
+    for d in displays:
+        d.pop('_in_current_mode', None)   # scratch key, keep it out of saved JSON
 
     return displays
 

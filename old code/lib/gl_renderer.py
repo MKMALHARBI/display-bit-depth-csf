@@ -1,0 +1,603 @@
+#!/usr/bin/env python3
+"""
+GL_RENDERER.PY - OpenGL 10-bit Rendering Module
+=================================================
+GLFW + PyOpenGL + FreeType renderer for 10-bit (1024 levels) grayscale display.
+Replaces Pygame rendering to achieve true sub-pixel contrast precision.
+"""
+
+import ctypes
+import collections
+import glfw
+import numpy as np
+import freetype
+
+from OpenGL.GL import *
+from OpenGL.GL import shaders
+
+
+# ---------------------------------------------------------------------------
+# Shader sources (OpenGL 3.3 core)
+# ---------------------------------------------------------------------------
+
+_VERT_SRC = """
+#version 330 core
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUV;
+out vec2 vUV;
+uniform vec2 uResolution;
+void main() {
+    // Convert pixel coords to clip space (-1..1), Y flipped for top-left origin
+    vec2 ndc = (aPos / uResolution) * 2.0 - 1.0;
+    ndc.y = -ndc.y;
+    gl_Position = vec4(ndc, 0.0, 1.0);
+    vUV = aUV;
+}
+"""
+
+_FRAG_SOLID = """
+#version 330 core
+out vec4 FragColor;
+uniform float uGray;
+void main() {
+    FragColor = vec4(vec3(uGray), 1.0);
+}
+"""
+
+_FRAG_GLYPH = """
+#version 330 core
+in vec2 vUV;
+out vec4 FragColor;
+uniform sampler2D uTex;
+uniform float uGray;
+void main() {
+    float alpha = texture(uTex, vUV).r;
+    FragColor = vec4(vec3(uGray), alpha);
+}
+"""
+
+_FRAG_NOISE = """
+#version 330 core
+in vec2 vUV;
+out vec4 FragColor;
+uniform sampler2D uTex;
+void main() {
+    float val = texture(uTex, vUV).r;
+    FragColor = vec4(vec3(val), 1.0);
+}
+"""
+
+_FRAG_COLOR = """
+#version 330 core
+out vec4 FragColor;
+uniform vec3 uColor;
+void main() {
+    FragColor = vec4(uColor, 1.0);
+}
+"""
+
+
+class GLRenderer:
+    """OpenGL 3.3 core renderer with 10-bit framebuffer support."""
+
+    def __init__(self, width, height, monitor_index=0, fullscreen=True):
+        if not glfw.init():
+            raise RuntimeError("Failed to initialise GLFW")
+
+        # Request 10-10-10-2 framebuffer
+        glfw.window_hint(glfw.RED_BITS, 10)
+        glfw.window_hint(glfw.GREEN_BITS, 10)
+        glfw.window_hint(glfw.BLUE_BITS, 10)
+        glfw.window_hint(glfw.ALPHA_BITS, 2)
+
+        # OpenGL 3.3 core
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+        glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
+        glfw.window_hint(glfw.AUTO_ICONIFY, glfw.FALSE)
+
+        monitors = glfw.get_monitors()
+        monitor = monitors[monitor_index] if monitor_index < len(monitors) else glfw.get_primary_monitor()
+
+        if fullscreen:
+            self._window = glfw.create_window(width, height, "Experiment", monitor, None)
+        else:
+            self._window = glfw.create_window(width, height, "Experiment", None, None)
+
+        if not self._window:
+            glfw.terminate()
+            raise RuntimeError("Failed to create GLFW window")
+
+        glfw.make_context_current(self._window)
+        glfw.swap_interval(1)  # vsync
+
+        # Use actual framebuffer size (may differ from requested in windowed mode)
+        fb_w, fb_h = glfw.get_framebuffer_size(self._window)
+        self.width = fb_w
+        self.height = fb_h
+
+        # Verify framebuffer bit depth
+        self._verify_framebuffer()
+
+        # Key input state
+        self._key_queue = collections.deque()
+        glfw.set_key_callback(self._window, self._key_callback)
+
+        # Mouse input state
+        self._mouse_queue = collections.deque()
+        glfw.set_mouse_button_callback(self._window, self._mouse_button_callback)
+
+        # Resize callback to keep viewport and coordinates in sync
+        glfw.set_framebuffer_size_callback(self._window, self._framebuffer_size_callback)
+
+        # Build shaders
+        self._build_shaders()
+
+        # Create a reusable quad VAO
+        self._quad_vao, self._quad_vbo = self._make_quad_vao()
+
+        # Glyph texture cache: (face_path, char, size) -> {tex, w, h, bearing_x, bearing_y, advance}
+        self._glyph_cache = {}
+
+        # FreeType face cache: path -> freetype.Face
+        self._face_cache = {}
+
+        # GL state
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glDisable(GL_DEPTH_TEST)
+        glViewport(0, 0, self.width, self.height)
+
+        # Hide cursor
+        glfw.set_input_mode(self._window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+
+    # ------------------------------------------------------------------
+    # Framebuffer verification
+    # ------------------------------------------------------------------
+
+    def _verify_framebuffer(self):
+        """Query actual framebuffer bit depths and print report."""
+        r = ctypes.c_int()
+        g = ctypes.c_int()
+        b = ctypes.c_int()
+        a = ctypes.c_int()
+        glGetFramebufferAttachmentParameteriv(
+            GL_FRAMEBUFFER, GL_BACK_LEFT,
+            GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, r)
+        glGetFramebufferAttachmentParameteriv(
+            GL_FRAMEBUFFER, GL_BACK_LEFT,
+            GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, g)
+        glGetFramebufferAttachmentParameteriv(
+            GL_FRAMEBUFFER, GL_BACK_LEFT,
+            GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, b)
+        glGetFramebufferAttachmentParameteriv(
+            GL_FRAMEBUFFER, GL_BACK_LEFT,
+            GL_FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE, a)
+        self.fb_red_bits = r.value
+        self.fb_green_bits = g.value
+        self.fb_blue_bits = b.value
+        self.fb_alpha_bits = a.value
+        print(f"Framebuffer: R={r.value} G={g.value} B={b.value} A={a.value} bits")
+        if r.value >= 10:
+            print("  -> 10-bit rendering CONFIRMED")
+        else:
+            print("  -> WARNING: 10-bit not available, got 8-bit fallback")
+
+    # ------------------------------------------------------------------
+    # Shader compilation
+    # ------------------------------------------------------------------
+
+    def _build_shaders(self):
+        vert = shaders.compileShader(_VERT_SRC, GL_VERTEX_SHADER)
+
+        frag_solid = shaders.compileShader(_FRAG_SOLID, GL_FRAGMENT_SHADER)
+        self._prog_solid = shaders.compileProgram(vert, frag_solid)
+
+        frag_glyph = shaders.compileShader(_FRAG_GLYPH, GL_FRAGMENT_SHADER)
+        self._prog_glyph = shaders.compileProgram(vert, frag_glyph)
+
+        frag_noise = shaders.compileShader(_FRAG_NOISE, GL_FRAGMENT_SHADER)
+        self._prog_noise = shaders.compileProgram(vert, frag_noise)
+
+        frag_color = shaders.compileShader(_FRAG_COLOR, GL_FRAGMENT_SHADER)
+        self._prog_color = shaders.compileProgram(vert, frag_color)
+
+    # ------------------------------------------------------------------
+    # Quad VAO (reusable, updated per-draw via VBO)
+    # ------------------------------------------------------------------
+
+    def _make_quad_vao(self):
+        vao = glGenVertexArrays(1)
+        vbo = glGenBuffers(1)
+        glBindVertexArray(vao)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        # 6 vertices * (2 pos + 2 uv) = 24 floats, allocate empty
+        glBufferData(GL_ARRAY_BUFFER, 24 * 4, None, GL_DYNAMIC_DRAW)
+        # aPos
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        # aUV
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(8))
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+        return vao, vbo
+
+    def _upload_quad(self, x, y, w, h, u0=0.0, v0=0.0, u1=1.0, v1=1.0):
+        """Upload a positioned quad to the VBO."""
+        x2, y2 = x + w, y + h
+        data = np.array([
+            x,  y,  u0, v0,
+            x2, y,  u1, v0,
+            x2, y2, u1, v1,
+            x,  y,  u0, v0,
+            x2, y2, u1, v1,
+            x,  y2, u0, v1,
+        ], dtype=np.float32)
+        glBindBuffer(GL_ARRAY_BUFFER, self._quad_vbo)
+        glBufferSubData(GL_ARRAY_BUFFER, 0, data.nbytes, data)
+
+    def _draw_quad(self):
+        glBindVertexArray(self._quad_vao)
+        glDrawArrays(GL_TRIANGLES, 0, 6)
+        glBindVertexArray(0)
+
+    # ------------------------------------------------------------------
+    # Drawing primitives
+    # ------------------------------------------------------------------
+
+    def clear(self, gray=0.498):
+        """Clear screen to a gray level (0.0-1.0). Default is mid-gray ~127/255."""
+        glClearColor(gray, gray, gray, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+    def draw_rect_filled(self, x, y, w, h, gray):
+        """Draw a filled rectangle at pixel coords with given gray level (0.0-1.0)."""
+        glUseProgram(self._prog_solid)
+        glUniform2f(glGetUniformLocation(self._prog_solid, "uResolution"),
+                    self.width, self.height)
+        glUniform1f(glGetUniformLocation(self._prog_solid, "uGray"), gray)
+        self._upload_quad(x, y, w, h)
+        self._draw_quad()
+
+    def draw_rect_outline(self, x, y, w, h, gray, thickness=2):
+        """Draw a rectangle outline."""
+        # top
+        self.draw_rect_filled(x, y, w, thickness, gray)
+        # bottom
+        self.draw_rect_filled(x, y + h - thickness, w, thickness, gray)
+        # left
+        self.draw_rect_filled(x, y + thickness, thickness, h - 2 * thickness, gray)
+        # right
+        self.draw_rect_filled(x + w - thickness, y + thickness, thickness, h - 2 * thickness, gray)
+
+    def draw_rect_color(self, x, y, w, h, r, g, b):
+        """Draw a filled rectangle with RGB color (each 0.0-1.0)."""
+        glUseProgram(self._prog_color)
+        glUniform2f(glGetUniformLocation(self._prog_color, "uResolution"),
+                    self.width, self.height)
+        glUniform3f(glGetUniformLocation(self._prog_color, "uColor"), r, g, b)
+        self._upload_quad(x, y, w, h)
+        self._draw_quad()
+
+    def draw_rect_outline_color(self, x, y, w, h, r, g, b, thickness=2):
+        """Draw a rectangle outline with RGB color."""
+        self.draw_rect_color(x, y, w, thickness, r, g, b)
+        self.draw_rect_color(x, y + h - thickness, w, thickness, r, g, b)
+        self.draw_rect_color(x, y + thickness, thickness, h - 2 * thickness, r, g, b)
+        self.draw_rect_color(x + w - thickness, y + thickness, thickness, h - 2 * thickness, r, g, b)
+
+    def flip(self):
+        """Swap buffers (present frame). Blocks until vsync."""
+        glfw.swap_buffers(self._window)
+
+    # ------------------------------------------------------------------
+    # FreeType text rendering
+    # ------------------------------------------------------------------
+
+    def load_font(self, font_path, size):
+        """Load a FreeType font face. Returns the font_path as a handle."""
+        if font_path not in self._face_cache:
+            face = freetype.Face(font_path)
+            face.set_pixel_sizes(0, size)
+            self._face_cache[font_path] = face
+        else:
+            face = self._face_cache[font_path]
+            face.set_pixel_sizes(0, size)
+        return font_path
+
+    def _get_glyph(self, font_path, char, size):
+        """Get or create a cached glyph texture."""
+        key = (font_path, char, size)
+        if key in self._glyph_cache:
+            return self._glyph_cache[key]
+
+        face = self._face_cache[font_path]
+        face.set_pixel_sizes(0, size)
+        face.load_char(char, freetype.FT_LOAD_RENDER)
+        glyph = face.glyph
+        bitmap = glyph.bitmap
+
+        w = bitmap.width
+        h = bitmap.rows
+
+        if w == 0 or h == 0:
+            info = {'tex': 0, 'w': 0, 'h': 0,
+                    'bearing_x': 0, 'bearing_y': 0,
+                    'advance': glyph.advance.x >> 6}
+            self._glyph_cache[key] = info
+            return info
+
+        # Upload bitmap as GL_R8 texture
+        buf = np.array(bitmap.buffer, dtype=np.uint8).reshape(h, w)
+        tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0,
+                     GL_RED, GL_UNSIGNED_BYTE, buf)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+        info = {
+            'tex': tex,
+            'w': w,
+            'h': h,
+            'bearing_x': glyph.bitmap_left,
+            'bearing_y': glyph.bitmap_top,
+            'advance': glyph.advance.x >> 6,
+        }
+        self._glyph_cache[key] = info
+        return info
+
+    def measure_text(self, font_path, text, size):
+        """Measure text width and height in pixels."""
+        total_w = 0
+        max_ascent = 0
+        max_descent = 0
+        for ch in text:
+            g = self._get_glyph(font_path, ch, size)
+            total_w += g['advance']
+            ascent = g['bearing_y']
+            descent = g['h'] - g['bearing_y']
+            if ascent > max_ascent:
+                max_ascent = ascent
+            if descent > max_descent:
+                max_descent = descent
+        return total_w, max_ascent + max_descent, max_ascent
+
+    def draw_text(self, font_path, text, x, y, size, gray):
+        """Draw text at (x, y) baseline position with given gray level."""
+        glUseProgram(self._prog_glyph)
+        glUniform2f(glGetUniformLocation(self._prog_glyph, "uResolution"),
+                    self.width, self.height)
+        glUniform1f(glGetUniformLocation(self._prog_glyph, "uGray"), gray)
+        glActiveTexture(GL_TEXTURE0)
+        glUniform1i(glGetUniformLocation(self._prog_glyph, "uTex"), 0)
+
+        cursor_x = x
+        for ch in text:
+            g = self._get_glyph(font_path, ch, size)
+            if g['tex'] == 0:
+                cursor_x += g['advance']
+                continue
+            gx = cursor_x + g['bearing_x']
+            gy = y - g['bearing_y']
+            glBindTexture(GL_TEXTURE_2D, g['tex'])
+            self._upload_quad(gx, gy, g['w'], g['h'])
+            self._draw_quad()
+            cursor_x += g['advance']
+
+    def draw_text_centered(self, font_path, text, cx, cy, size, gray):
+        """Draw text centered at (cx, cy) pixel coordinates."""
+        tw, th, ascent = self.measure_text(font_path, text, size)
+        x = cx - tw // 2
+        y = cy + ascent - th // 2  # baseline so glyph bbox is centered on cy
+        self.draw_text(font_path, text, x, y, size, gray)
+
+    # ------------------------------------------------------------------
+    # Noise texture
+    # ------------------------------------------------------------------
+
+    def create_noise_texture(self, noise_array):
+        """Upload a 2D float32 array (0.0-1.0) as a GL_R16F texture.
+        Returns the texture ID."""
+        h, w = noise_array.shape
+        tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        data = noise_array.astype(np.float32)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, w, h, 0,
+                     GL_RED, GL_FLOAT, data)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        return tex
+
+    def draw_noise_texture(self, tex, x, y, w, h, additive=True):
+        """Draw a noise texture at pixel coords.
+        If additive=True, uses GL_ONE,GL_ONE blending (like BLEND_ADD)."""
+        if additive:
+            glBlendFunc(GL_ONE, GL_ONE)
+
+        glUseProgram(self._prog_noise)
+        glUniform2f(glGetUniformLocation(self._prog_noise, "uResolution"),
+                    self.width, self.height)
+        glActiveTexture(GL_TEXTURE0)
+        glUniform1i(glGetUniformLocation(self._prog_noise, "uTex"), 0)
+        glBindTexture(GL_TEXTURE_2D, tex)
+        self._upload_quad(x, y, w, h)
+        self._draw_quad()
+
+        if additive:
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    def delete_texture(self, tex):
+        """Free a GL texture."""
+        glDeleteTextures(1, [tex])
+
+    # ------------------------------------------------------------------
+    # Input handling
+    # ------------------------------------------------------------------
+
+    def _framebuffer_size_callback(self, window, w, h):
+        """Update viewport and dimensions when window is resized."""
+        self.width = w
+        self.height = h
+        glViewport(0, 0, w, h)
+
+    def _key_callback(self, window, key, scancode, action, mods):
+        if action == glfw.PRESS:
+            self._key_queue.append(key)
+
+    def _mouse_button_callback(self, window, button, action, mods):
+        if button == glfw.MOUSE_BUTTON_LEFT and action == glfw.PRESS:
+            x, y = glfw.get_cursor_pos(window)
+            self._mouse_queue.append((x, y))
+
+    def poll_events(self):
+        """Process pending GLFW events (call every frame)."""
+        glfw.poll_events()
+
+    def poll_key(self):
+        """Return next key from buffer, or None."""
+        self.poll_events()
+        if self._key_queue:
+            return self._key_queue.popleft()
+        return None
+
+    def wait_key(self, timeout=None):
+        """Block until a key is pressed. Returns GLFW key constant.
+        If timeout (seconds) given, returns None on timeout."""
+        start = glfw.get_time()
+        while True:
+            self.poll_events()
+            if self._key_queue:
+                return self._key_queue.popleft()
+            if self.should_close():
+                return glfw.KEY_ESCAPE
+            if timeout is not None and (glfw.get_time() - start) > timeout:
+                return None
+            glfw.wait_events_timeout(0.01)
+
+    def poll_mouse_click(self):
+        """Return (x, y) of next left-click, or None."""
+        if self._mouse_queue:
+            return self._mouse_queue.popleft()
+        return None
+
+    def show_cursor(self):
+        """Show the mouse cursor."""
+        glfw.set_input_mode(self._window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+
+    def should_close(self):
+        """Check if window should close."""
+        return glfw.window_should_close(self._window)
+
+    def get_time(self):
+        """High-resolution timer in seconds."""
+        return glfw.get_time()
+
+    # ------------------------------------------------------------------
+    # GLFW key constants (re-exported for convenience)
+    # ------------------------------------------------------------------
+
+    KEY_ESCAPE = glfw.KEY_ESCAPE
+    KEY_SPACE = glfw.KEY_SPACE
+    KEY_C = glfw.KEY_C
+    KEY_D = glfw.KEY_D
+    KEY_H = glfw.KEY_H
+    KEY_K = glfw.KEY_K
+    KEY_N = glfw.KEY_N
+    KEY_O = glfw.KEY_O
+    KEY_R = glfw.KEY_R
+    KEY_S = glfw.KEY_S
+    KEY_V = glfw.KEY_V
+    KEY_Z = glfw.KEY_Z
+
+    # Map GLFW key constants to letter strings
+    KEY_TO_LETTER = {
+        glfw.KEY_A: 'A', glfw.KEY_B: 'B', glfw.KEY_C: 'C', glfw.KEY_D: 'D',
+        glfw.KEY_E: 'E', glfw.KEY_F: 'F', glfw.KEY_G: 'G', glfw.KEY_H: 'H',
+        glfw.KEY_I: 'I', glfw.KEY_J: 'J', glfw.KEY_K: 'K', glfw.KEY_L: 'L',
+        glfw.KEY_M: 'M', glfw.KEY_N: 'N', glfw.KEY_O: 'O', glfw.KEY_P: 'P',
+        glfw.KEY_Q: 'Q', glfw.KEY_R: 'R', glfw.KEY_S: 'S', glfw.KEY_T: 'T',
+        glfw.KEY_U: 'U', glfw.KEY_V: 'V', glfw.KEY_W: 'W', glfw.KEY_X: 'X',
+        glfw.KEY_Y: 'Y', glfw.KEY_Z: 'Z',
+    }
+
+    @staticmethod
+    def key_to_letter(key):
+        """Convert a GLFW key constant to uppercase letter string, or None."""
+        return GLRenderer.KEY_TO_LETTER.get(key, None)
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def destroy(self):
+        """Clean up all GL resources and terminate GLFW."""
+        for info in self._glyph_cache.values():
+            if info['tex']:
+                glDeleteTextures(1, [info['tex']])
+        self._glyph_cache.clear()
+
+        glDeleteVertexArrays(1, [self._quad_vao])
+        glDeleteBuffers(1, [self._quad_vbo])
+
+        glDeleteProgram(self._prog_solid)
+        glDeleteProgram(self._prog_glyph)
+        glDeleteProgram(self._prog_color)
+        glDeleteProgram(self._prog_noise)
+
+        glfw.destroy_window(self._window)
+        glfw.terminate()
+
+
+# ---------------------------------------------------------------------------
+# Standalone test
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import sys
+
+    print("GLRenderer standalone test")
+    print("Press ESC to exit\n")
+
+    W, H = 800, 600
+    renderer = GLRenderer(W, H, fullscreen=False)
+
+    font_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    renderer.load_font(font_path, 48)
+
+    frame = 0
+    while not renderer.should_close():
+        renderer.clear(0.498)
+
+        # Draw a gradient of 16 gray rects to show bit depth
+        n_steps = 16
+        rect_w = W // n_steps
+        for i in range(n_steps):
+            g = 0.45 + 0.1 * (i / (n_steps - 1))
+            renderer.draw_rect_filled(i * rect_w, H // 2 - 30, rect_w, 60, g)
+
+        # Draw text
+        renderer.draw_text_centered(font_path, "10-bit Renderer Test", W // 2, 80, 48, 0.8)
+        renderer.draw_text_centered(font_path, "Press ESC to exit", W // 2, H - 80, 32, 0.6)
+
+        # Show frame counter
+        renderer.draw_text_centered(font_path, f"Frame {frame}", W // 2, 140, 24, 0.7)
+
+        renderer.flip()
+        renderer.poll_events()
+
+        key = renderer.poll_key()
+        if key == glfw.KEY_ESCAPE:
+            break
+
+        frame += 1
+
+    renderer.destroy()
+    print("Test complete.")
