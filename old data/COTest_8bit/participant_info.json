@@ -1,0 +1,15 @@
+{
+  "name": "COTest",
+  "age": 0,
+  "sex": "O",
+  "ocular_dominance": "OD (Right)",
+  "level": "Undergraduate",
+  "year": "1",
+  "bit_depth": "8-bit",
+  "random_seed": 861439,
+  "experimenter": "Unknown",
+  "practice": false,
+  "timestamp": "20260513_203745",
+  "date": "13 May 2026",
+  "time": "20:37:45"
+}

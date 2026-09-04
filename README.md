@@ -58,10 +58,13 @@ Full apparatus description: [`DISPLAY_SETUP_8bit_vs_10bit.md`](DISPLAY_SETUP_8bi
 
 ## Photometric verification
 
-`luminance_analysis/` contains a direct measurement of the display with a **Konica Minolta
-CS-160** chroma meter on a locked tripod at 700 mm, 1/3° measuring angle, in a darkened room.
-The protocol — geometry, spot/patch ratio, environmental limits, warm-up, the on-screen
-positioning target — is in [`luminance_analysis/EXPERIMENT.md`](luminance_analysis/EXPERIMENT.md).
+The display was measured directly with a **Konica Minolta CS-160** chroma meter on a locked
+tripod at 700 mm, 1/3° measuring angle, in a darkened room. The protocol — geometry,
+spot/patch ratio, environmental limits, warm-up, the on-screen positioning target — is in
+`analysis/EXPERIMENT.md` in the **display-measurement** project.
+
+The measurement tools themselves live in that project rather than here: they serve several
+experiments, so keeping one copy avoids the two drifting apart.
 
 The test steps through every consecutive 10-bit code from 504 to 520 (17 patches). At 8-bit
 those 17 codes collapse onto about 6. Measured, with 3 readings per patch and ±2σ:
@@ -73,26 +76,6 @@ those 17 codes collapse onto about 6. Measured, with 3 readings per patch and ±
 | 8-bit | 5 of 5 | 1.98 | 434.20 ± 2.23 |
 
 So the 10-bit path is real, and it resolves roughly three times finer luminance steps.
-
-### A firmware bug found along the way
-
-The 10-bit luminance ramp is monotonic **except** for a dip at codes 511→512→513 — exactly the
-binary boundary 512 = `1000000000`. Luminance goes *down* by ~0.1 cd/m² where it should rise by
-~0.5, losing about one 10-bit LSB.
-
-[`luminance_analysis/FINDING_msb_carry_plateau.md`](luminance_analysis/FINDING_msb_carry_plateau.md)
-identifies the cause by elimination across five measurement conditions rather than by curve
-fitting. The dip:
-
-- **disappears** when the monitor is driven in 8-bit mode, or fed an externally pre-dithered
-  signal — so it is internal to the monitor's 10-bit decode, not the panel, backlight, GPU or link;
-- is **invariant to refresh rate** (60 Hz vs 120 Hz identical) — so it is not residual frame-rate control;
-- is present at 512 but **absent at 768**, which is equally a power-of-two LUT node — so it is not
-  LUT-node interpolation.
-
-The distinguishing property of 511→512 is that the carry propagates into the **most significant
-bit**. The surviving explanation is fixed-point carry rounding at bit 9 inside the monitor's
-internal pipeline, losing one LSB.
 
 `hdr_luminance_effect.md` separately shows that HDR state imposes a near-constant luminance
 offset (~11.7–12.6 cd/m²) while **preserving** dL/dV, so it shifts the adaptation level but
@@ -141,11 +124,12 @@ python step2_SR_experiment.py     # 10AFC
 python step3_SR_experiment.py     # 2AFC
 ```
 
-For the luminance measurement, follow `luminance_analysis/EXPERIMENT.md` and run:
+For the luminance measurement, switch to the **display-measurement** project, follow its
+`analysis/EXPERIMENT.md`, and run:
 
 ```bash
-python luminance_analysis/luminance_test.py       # drive the patches, log meter readings
-python luminance_analysis/luminance_analysis.py   # analyse the sweeps, produce the figures
+python luminance_test.py               # drive the patches, read the CS-160 over USB
+python analysis/luminance_analysis.py  # analyse the sweeps, produce the figures
 ```
 
 ## Analysis
@@ -183,14 +167,6 @@ calibration_analysis/
   plot_gamma_calibration_to_test.py   calibration-to-test contrast mapping
   plot_thresholds.py                  per-participant thresholds
 
-luminance_analysis/
-  EXPERIMENT.md                    measurement protocol and rig geometry
-  FINDING_msb_carry_plateau.md     root-cause analysis of the code-512 dip
-  hdr_luminance_effect.md          HDR offset vs quantisation step
-  luminance_stats.md               measurement summary table
-  luminance_test.py                drives the patches, logs readings
-  luminance_analysis.py            analyses the sweeps
-  luminance_*.csv                  the measurement sweeps
 ```
 
 ## Known issues
@@ -208,8 +184,8 @@ luminance_analysis/
 
 ## Data
 
-No participant data is included. The measurement sweeps in `luminance_analysis/` are photometer
-readings from the display, not human data, and are included.
+No participant data is included. The photometer sweeps of the display are not human data;
+they live with the measurement tools in the display-measurement project.
 
 ## References
 

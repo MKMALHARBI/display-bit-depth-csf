@@ -1,0 +1,15 @@
+{
+  "name": "NHTest",
+  "age": 0,
+  "sex": "O",
+  "ocular_dominance": "OD (Right)",
+  "level": "Undergraduate",
+  "year": "1",
+  "bit_depth": "10-bit",
+  "random_seed": 18517,
+  "experimenter": "Unknown",
+  "practice": false,
+  "timestamp": "20260513_200202",
+  "date": "13 May 2026",
+  "time": "20:02:02"
+}

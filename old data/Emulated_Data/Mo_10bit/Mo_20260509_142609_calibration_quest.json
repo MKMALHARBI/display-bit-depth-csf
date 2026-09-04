@@ -1,0 +1,852 @@
+{
+  "threshold_log10": 0.06127340178717844,
+  "threshold_linear": 1.1515250814096891,
+  "threshold_sd": 0.09453882658200302,
+  "thresholds_log10": [
+    0.0668269424991401,
+    0.05571986107521677
+  ],
+  "thresholds_linear": [
+    1.1663447598303653,
+    1.1368937031178055
+  ],
+  "sds": [
+    0.09442906524901819,
+    0.09464858791498787
+  ],
+  "participant": {
+    "name": "Mo",
+    "age": 38,
+    "sex": "M",
+    "ocular_dominance": "OD (Right)",
+    "level": "PhD",
+    "year": "4",
+    "bit_depth": "10-bit",
+    "random_seed": 6834,
+    "experimenter": "Mo",
+    "practice": false,
+    "timestamp": "20260509_142609",
+    "date": "09 May 2026",
+    "time": "14:26:09"
+  },
+  "timestamp": "2026-05-09T14:29:06.014603",
+  "display_calibration": {
+    "display_index": 0,
+    "display_info": {
+      "name": "DP-1",
+      "primary": true,
+      "resolution_w": 3840,
+      "resolution_h": 2160,
+      "pos_x": 0,
+      "pos_y": 0,
+      "width_mm": 710,
+      "height_mm": 400,
+      "gamma_r": 1.0,
+      "gamma_g": 1.0,
+      "gamma_b": 1.0,
+      "brightness": 0.0
+    }
+  },
+  "trial_log": [
+    {
+      "block": 1,
+      "trial": 1,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 39.81071705535018,
+      "log_contrast": 1.600000000000005,
+      "reaction_time_ms": 2272
+    },
+    {
+      "block": 1,
+      "trial": 2,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 3.98107170553501,
+      "log_contrast": 0.6000000000000041,
+      "reaction_time_ms": 882
+    },
+    {
+      "block": 1,
+      "trial": 3,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 871
+    },
+    {
+      "block": 1,
+      "trial": 4,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 0.25118864315095973,
+      "log_contrast": -0.599999999999997,
+      "reaction_time_ms": 917
+    },
+    {
+      "block": 1,
+      "trial": 5,
+      "correct_letter": "C",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 0.10000000000000062,
+      "log_contrast": -0.9999999999999973,
+      "reaction_time_ms": 778
+    },
+    {
+      "block": 1,
+      "trial": 6,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 1105
+    },
+    {
+      "block": 1,
+      "trial": 7,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 0.3981071705535002,
+      "log_contrast": -0.3999999999999968,
+      "reaction_time_ms": 1257
+    },
+    {
+      "block": 1,
+      "trial": 8,
+      "correct_letter": "C",
+      "response": "D",
+      "is_correct": false,
+      "contrast": 0.25118864315095973,
+      "log_contrast": -0.599999999999997,
+      "reaction_time_ms": 700
+    },
+    {
+      "block": 1,
+      "trial": 9,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 1797
+    },
+    {
+      "block": 1,
+      "trial": 10,
+      "correct_letter": "C",
+      "response": "D",
+      "is_correct": false,
+      "contrast": 0.3981071705535002,
+      "log_contrast": -0.3999999999999968,
+      "reaction_time_ms": 656
+    },
+    {
+      "block": 1,
+      "trial": 11,
+      "correct_letter": "C",
+      "response": "D",
+      "is_correct": false,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 748
+    },
+    {
+      "block": 1,
+      "trial": 12,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 1034
+    },
+    {
+      "block": 1,
+      "trial": 13,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 875
+    },
+    {
+      "block": 1,
+      "trial": 14,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 784
+    },
+    {
+      "block": 1,
+      "trial": 15,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 975
+    },
+    {
+      "block": 1,
+      "trial": 16,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 789
+    },
+    {
+      "block": 1,
+      "trial": 17,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 813
+    },
+    {
+      "block": 1,
+      "trial": 18,
+      "correct_letter": "D",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 606
+    },
+    {
+      "block": 1,
+      "trial": 19,
+      "correct_letter": "C",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 0.6309573444801981,
+      "log_contrast": -0.19999999999999662,
+      "reaction_time_ms": 777
+    },
+    {
+      "block": 1,
+      "trial": 20,
+      "correct_letter": "C",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 626
+    },
+    {
+      "block": 1,
+      "trial": 21,
+      "correct_letter": "D",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 693
+    },
+    {
+      "block": 1,
+      "trial": 22,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 595
+    },
+    {
+      "block": 1,
+      "trial": 23,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 694
+    },
+    {
+      "block": 1,
+      "trial": 24,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 982
+    },
+    {
+      "block": 1,
+      "trial": 25,
+      "correct_letter": "D",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 823
+    },
+    {
+      "block": 1,
+      "trial": 26,
+      "correct_letter": "C",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 543
+    },
+    {
+      "block": 1,
+      "trial": 27,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 514
+    },
+    {
+      "block": 1,
+      "trial": 28,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 983
+    },
+    {
+      "block": 1,
+      "trial": 29,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 825
+    },
+    {
+      "block": 1,
+      "trial": 30,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 663
+    },
+    {
+      "block": 1,
+      "trial": 31,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 720
+    },
+    {
+      "block": 1,
+      "trial": 32,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 737
+    },
+    {
+      "block": 1,
+      "trial": 33,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 690
+    },
+    {
+      "block": 1,
+      "trial": 34,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 649
+    },
+    {
+      "block": 1,
+      "trial": 35,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 574
+    },
+    {
+      "block": 1,
+      "trial": 36,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 881
+    },
+    {
+      "block": 1,
+      "trial": 37,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 638
+    },
+    {
+      "block": 1,
+      "trial": 38,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 728
+    },
+    {
+      "block": 1,
+      "trial": 39,
+      "correct_letter": "C",
+      "response": "O",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 786
+    },
+    {
+      "block": 1,
+      "trial": 40,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 640
+    },
+    {
+      "block": 2,
+      "trial": 1,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 39.81071705535018,
+      "log_contrast": 1.600000000000005,
+      "reaction_time_ms": 561
+    },
+    {
+      "block": 2,
+      "trial": 2,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 3.98107170553501,
+      "log_contrast": 0.6000000000000041,
+      "reaction_time_ms": 707
+    },
+    {
+      "block": 2,
+      "trial": 3,
+      "correct_letter": "O",
+      "response": "D",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 1833
+    },
+    {
+      "block": 2,
+      "trial": 4,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 25.11886431509608,
+      "log_contrast": 1.4000000000000048,
+      "reaction_time_ms": 3650
+    },
+    {
+      "block": 2,
+      "trial": 5,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 10.000000000000103,
+      "log_contrast": 1.0000000000000044,
+      "reaction_time_ms": 1130
+    },
+    {
+      "block": 2,
+      "trial": 6,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 6.309573444801995,
+      "log_contrast": 0.8000000000000043,
+      "reaction_time_ms": 838
+    },
+    {
+      "block": 2,
+      "trial": 7,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 3.98107170553501,
+      "log_contrast": 0.6000000000000041,
+      "reaction_time_ms": 704
+    },
+    {
+      "block": 2,
+      "trial": 8,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 3.98107170553501,
+      "log_contrast": 0.6000000000000041,
+      "reaction_time_ms": 772
+    },
+    {
+      "block": 2,
+      "trial": 9,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 834
+    },
+    {
+      "block": 2,
+      "trial": 10,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 677
+    },
+    {
+      "block": 2,
+      "trial": 11,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 636
+    },
+    {
+      "block": 2,
+      "trial": 12,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 657
+    },
+    {
+      "block": 2,
+      "trial": 13,
+      "correct_letter": "O",
+      "response": "C",
+      "is_correct": false,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 716
+    },
+    {
+      "block": 2,
+      "trial": 14,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 733
+    },
+    {
+      "block": 2,
+      "trial": 15,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 785
+    },
+    {
+      "block": 2,
+      "trial": 16,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 2.511886431509603,
+      "log_contrast": 0.4000000000000039,
+      "reaction_time_ms": 764
+    },
+    {
+      "block": 2,
+      "trial": 17,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 1128
+    },
+    {
+      "block": 2,
+      "trial": 18,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 773
+    },
+    {
+      "block": 2,
+      "trial": 19,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 619
+    },
+    {
+      "block": 2,
+      "trial": 20,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 659
+    },
+    {
+      "block": 2,
+      "trial": 21,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 516
+    },
+    {
+      "block": 2,
+      "trial": 22,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 684
+    },
+    {
+      "block": 2,
+      "trial": 23,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 792
+    },
+    {
+      "block": 2,
+      "trial": 24,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 677
+    },
+    {
+      "block": 2,
+      "trial": 25,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 846
+    },
+    {
+      "block": 2,
+      "trial": 26,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 844
+    },
+    {
+      "block": 2,
+      "trial": 27,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 841
+    },
+    {
+      "block": 2,
+      "trial": 28,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 612
+    },
+    {
+      "block": 2,
+      "trial": 29,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 695
+    },
+    {
+      "block": 2,
+      "trial": 30,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 791
+    },
+    {
+      "block": 2,
+      "trial": 31,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 770
+    },
+    {
+      "block": 2,
+      "trial": 32,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 3415
+    },
+    {
+      "block": 2,
+      "trial": 33,
+      "correct_letter": "O",
+      "response": "D",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 662
+    },
+    {
+      "block": 2,
+      "trial": 34,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 913
+    },
+    {
+      "block": 2,
+      "trial": 35,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 4569
+    },
+    {
+      "block": 2,
+      "trial": 36,
+      "correct_letter": "D",
+      "response": "D",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 692
+    },
+    {
+      "block": 2,
+      "trial": 37,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 1142
+    },
+    {
+      "block": 2,
+      "trial": 38,
+      "correct_letter": "C",
+      "response": "D",
+      "is_correct": false,
+      "contrast": 1.0000000000000082,
+      "log_contrast": 3.552713678800501e-15,
+      "reaction_time_ms": 906
+    },
+    {
+      "block": 2,
+      "trial": 39,
+      "correct_letter": "C",
+      "response": "C",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 569
+    },
+    {
+      "block": 2,
+      "trial": 40,
+      "correct_letter": "O",
+      "response": "O",
+      "is_correct": true,
+      "contrast": 1.5848931924611271,
+      "log_contrast": 0.20000000000000373,
+      "reaction_time_ms": 743
+    }
+  ]
+}

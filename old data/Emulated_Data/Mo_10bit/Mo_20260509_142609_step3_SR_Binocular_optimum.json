@@ -1,0 +1,23 @@
+{
+  "optimum_noise_level": 0.0,
+  "optimum_accuracy": 0.5333333333333333,
+  "accuracy_by_noise": {
+    "0.0": 0.5333333333333333
+  },
+  "participant": {
+    "name": "Mo",
+    "age": 38,
+    "sex": "M",
+    "ocular_dominance": "OD (Right)",
+    "level": "PhD",
+    "year": "4",
+    "bit_depth": "10-bit",
+    "random_seed": 6834,
+    "experimenter": "Mo",
+    "practice": false,
+    "timestamp": "20260509_142609",
+    "date": "09 May 2026",
+    "time": "14:26:09"
+  },
+  "timestamp": "2026-05-09T14:34:08.296525"
+}

@@ -18,9 +18,44 @@ import glfw
 from datetime import datetime
 
 from lib.parameters import params, paths, fonts
-from lib.exp_dialog import get_participant_info, create_data_folder, save_participant_info
+from lib.exp_dialog import framebuffer_bits, get_participant_info, create_data_folder, save_participant_info
 from lib.display_utils import DisplayCalibration, print_all_displays, setup_display_for_glfw
 from lib.gl_renderer import GLRenderer
+from lib.gamma_correction import ramp_fingerprint, GAMMA_POWER
+
+
+# ---------------------------------------------------------------------------
+# DISPLAY BIT-DEPTH CONDITION
+#
+#   10 -> 10:10:10:2 framebuffer (1024 grey levels)
+#    8 -> 8:8:8:8   framebuffer (256 grey levels)
+#
+# Set in the participant dialog's Bit Depth field, not here: the same choice
+# names the data folder (Data/<name>_10bit), so a session cannot be run at one
+# depth and filed under the other. Steps 2 and 3 inherit it from step 1 through
+# participant_info.json, so all three steps of a session match by construction.
+#
+# The depth has to be requested from OpenGL rather than inherited from the OS.
+# Windows grants a 10-bit framebuffer whatever the driver's output colour depth
+# is set to, then dithers the surplus bits away at scanout - so running the
+# "8-bit" condition by switching the NVIDIA setting alone presents a dithered
+# 10-bit stimulus and still logs R=10. Asking for 8:8:8:8 leaves nothing
+# sub-8-bit to dither.
+#
+# The original apparatus (Ubuntu, X11 depth-30 vs Wayland) got the same effect
+# from the session type; see DISPLAY_SETUP_8bit_vs_10bit.md.
+#
+# FORCE_FRAMEBUFFER_BITS overrides the dialog - for debugging on a machine that
+# cannot grant the depth being tested. It makes the run disagree with its own
+# folder name, so leave it None for real sessions.
+FORCE_FRAMEBUFFER_BITS = None
+
+# A granted depth that differs from the requested one is not a harmless
+# fallback: asking for 8 and getting 10 IS the silent-dithering case this whole
+# experiment exists to avoid. Refuse to collect data under it unless someone
+# deliberately says otherwise.
+ALLOW_BIT_DEPTH_MISMATCH = False
+# ---------------------------------------------------------------------------
 
 
 class SimpleQUEST:
@@ -94,6 +129,10 @@ def run_quest_calibration():
         print("Experiment cancelled.")
         return
 
+    fb_bits = FORCE_FRAMEBUFFER_BITS or framebuffer_bits(info)
+    print(f"Bit-depth condition: {info.get('bit_depth')} "
+          f"-> requesting a {fb_bits}-bit framebuffer")
+
     random.seed(info['random_seed'])
     np.random.seed(info['random_seed'])
 
@@ -111,9 +150,20 @@ def run_quest_calibration():
     font_size = params['font_size']
     frame_size = params['frame_size']
 
-    # Create OpenGL renderer (10-bit framebuffer)
-    renderer = GLRenderer(width, height, monitor_index=DISPLAY_INDEX, fullscreen=False)
+    # Create OpenGL renderer at this session's bit depth
+    renderer = GLRenderer(width, height, monitor_index=DISPLAY_INDEX,
+                          fullscreen=False, bits=fb_bits,
+                          gamma_correct='identity', shader_gamma=(GAMMA_POWER,) * 3)
     width, height = renderer.width, renderer.height
+
+    # _verify_framebuffer() has just printed what OpenGL actually granted.
+    if not renderer.bits_confirmed and not ALLOW_BIT_DEPTH_MISMATCH:
+        print(f"ABORTING: asked for a {fb_bits}-bit framebuffer, got "
+              f"{renderer.fb_red_bits}-bit. This session would be filed as "
+              f"{info.get('bit_depth')} while presenting something else.")
+        print("Set ALLOW_BIT_DEPTH_MISMATCH = True to override.")
+        renderer.destroy()
+        return
 
     renderer.clear(0.498)
     renderer.flip()
@@ -355,6 +405,15 @@ def run_quest_calibration():
             'participant': info,
             'timestamp': datetime.now().isoformat(),
             'display_calibration': display_cal.to_dict(),
+            'display_bit_depth': {
+                'framebuffer_bits_requested': fb_bits,
+                'framebuffer_bits_actual': renderer.fb_red_bits,
+                'framebuffer_confirmed': renderer.bits_confirmed,
+                'output_bpc': info.get('output_bpc', 'unknown'),
+                'driver_dither': info.get('driver_dither', 'unknown'),
+                **ramp_fingerprint(renderer.monitor),
+                **(renderer.gamma.info() if renderer.gamma else {}),
+            },
             'trial_log': trial_log,
         }
 

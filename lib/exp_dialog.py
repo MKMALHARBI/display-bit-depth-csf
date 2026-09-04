@@ -79,6 +79,8 @@ def get_participant_info(experiment_name="Experiment", check_duplicates=True, lo
                 'level': "Undergraduate",
                 'year': "1",
                 'bit_depth': combo_bit.get() or "10-bit",
+                'output_bpc': combo_bpc.get() or "unknown",
+                'driver_dither': combo_dither.get() or "unknown",
                 'random_seed': random.randint(1, 999999),
                 'experimenter': "Test",
                 'practice': True,
@@ -120,6 +122,8 @@ def get_participant_info(experiment_name="Experiment", check_duplicates=True, lo
 
         ocular_dominance = combo_eye.get() or "OD (Right)"
         bit_depth = combo_bit.get() or "10-bit"
+        output_bpc = combo_bpc.get() or "unknown"
+        driver_dither = combo_dither.get() or "unknown"
 
         result['data'] = {
             'name': f"Practice_{subject_id}" if practice else subject_id,
@@ -129,6 +133,8 @@ def get_participant_info(experiment_name="Experiment", check_duplicates=True, lo
             'level': level,
             'year': year,
             'bit_depth': bit_depth,
+            'output_bpc': output_bpc,
+            'driver_dither': driver_dither,
             'random_seed': seed,
             'experimenter': experimenter,
             'practice': practice,
@@ -144,7 +150,6 @@ def get_participant_info(experiment_name="Experiment", check_duplicates=True, lo
 
     root = tk.Tk()
     root.title(f"{experiment_name} - Participant Info")
-    root.geometry("900x890")
     root.resizable(False, False)
 
     big_font = ("Arial", 18)
@@ -195,24 +200,46 @@ def get_participant_info(experiment_name="Experiment", check_duplicates=True, lo
     combo_bit.set("10-bit")
     combo_bit.grid(row=6, column=1, pady=10)
 
-    ttk.Label(frame, text="Random Seed:", style="Big.TLabel").grid(row=7, column=0, sticky="w", pady=10)
-    entry_seed = ttk.Entry(frame, width=25, font=entry_font)
-    entry_seed.grid(row=7, column=1, pady=10)
+    # Driver output state. Neither the link depth nor the driver's dithering is
+    # readable from any API on Windows (NVIDIA Control Panel -> Change
+    # resolution -> Output color depth; dithering is not exposed at all), so
+    # both are entered per session and logged, as in luminance_test.py.
+    ttk.Label(frame, text="Driver Output Depth:", style="Big.TLabel").grid(row=7, column=0, sticky="w", pady=10)
+    combo_bpc = ttk.Combobox(frame, values=["8 bpc", "10 bpc", "unknown"], width=23, font=entry_font, style="Big.TCombobox", state="readonly")
+    combo_bpc.set("unknown")
+    combo_bpc.grid(row=7, column=1, pady=10)
 
-    ttk.Label(frame, text="Experimenter:", style="Big.TLabel").grid(row=8, column=0, sticky="w", pady=10)
+    ttk.Label(frame, text="Driver Dithering:", style="Big.TLabel").grid(row=8, column=0, sticky="w", pady=10)
+    combo_dither = ttk.Combobox(frame, values=["on", "off", "unknown"], width=23, font=entry_font, style="Big.TCombobox", state="readonly")
+    combo_dither.set("unknown")
+    combo_dither.grid(row=8, column=1, pady=10)
+
+    ttk.Label(frame, text="Random Seed:", style="Big.TLabel").grid(row=9, column=0, sticky="w", pady=10)
+    entry_seed = ttk.Entry(frame, width=25, font=entry_font)
+    entry_seed.grid(row=9, column=1, pady=10)
+
+    ttk.Label(frame, text="Experimenter:", style="Big.TLabel").grid(row=10, column=0, sticky="w", pady=10)
     entry_exp = ttk.Entry(frame, width=25, font=entry_font)
-    entry_exp.grid(row=8, column=1, pady=10)
+    entry_exp.grid(row=10, column=1, pady=10)
 
     var_practice = tk.BooleanVar()
-    ttk.Checkbutton(frame, text="Practice Mode", variable=var_practice, style="Big.TCheckbutton").grid(row=9, column=1, sticky="w", pady=10)
+    ttk.Checkbutton(frame, text="Practice Mode", variable=var_practice, style="Big.TCheckbutton").grid(row=11, column=1, sticky="w", pady=10)
 
     var_quicktest = tk.BooleanVar()
-    ttk.Checkbutton(frame, text="Quick Test (skip dialog, all values = 1)", variable=var_quicktest, style="Big.TCheckbutton").grid(row=10, column=1, sticky="w", pady=10)
+    ttk.Checkbutton(frame, text="Quick Test (skip dialog, all values = 1)", variable=var_quicktest, style="Big.TCheckbutton").grid(row=12, column=1, sticky="w", pady=10)
 
     btn_frame = ttk.Frame(frame)
-    btn_frame.grid(row=11, column=0, columnspan=2, pady=30)
+    btn_frame.grid(row=13, column=0, columnspan=2, pady=30)
     ttk.Button(btn_frame, text="OK", command=on_submit, width=12, style="Big.TButton").pack(side=tk.LEFT, padx=15)
     ttk.Button(btn_frame, text="Cancel", command=on_cancel, width=12, style="Big.TButton").pack(side=tk.LEFT, padx=15)
+
+    # Size the window to fit its content and center it, so no field, label or
+    # checkbox is clipped regardless of font sizes or label lengths.
+    root.update_idletasks()
+    req_w, req_h = root.winfo_reqwidth(), root.winfo_reqheight()
+    pos_x = max(0, (root.winfo_screenwidth() - req_w) // 2)
+    pos_y = max(0, (root.winfo_screenheight() - req_h) // 2)
+    root.geometry(f"{req_w}x{req_h}+{pos_x}+{pos_y}")
 
     entry_id.focus()
     root.mainloop()
@@ -220,6 +247,23 @@ def get_participant_info(experiment_name="Experiment", check_duplicates=True, lo
     if result['cancelled']:
         return None
     return result['data']
+
+
+def framebuffer_bits(info):
+    """Framebuffer depth for this session, from the dialog's Bit Depth field.
+
+    One source of truth for the condition. The same value names the data folder
+    (Data/<name>_10bit), so a session cannot be run at one depth and filed under
+    the other - which is what a separate module-level constant allowed.
+
+    The depth has to be requested from OpenGL, not inherited from the OS:
+    Windows grants a 10-bit framebuffer whatever the driver's output depth is
+    set to and dithers the surplus away at scanout, so an "8-bit" run selected
+    in the NVIDIA panel alone is a dithered 10-bit stimulus that still reports
+    R=10. See DISPLAY_SETUP_8bit_vs_10bit.md section 9.
+    """
+    label = (info.get('bit_depth') or "10-bit").strip()
+    return 8 if label.startswith("8") else 10
 
 
 def create_data_folder(info, experiment_name=None, base_dir="."):

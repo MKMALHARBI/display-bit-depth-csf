@@ -5,13 +5,113 @@ DISPLAY_UTILS.PY - Display Detection
 Detects displays and sets up pygame for correct monitor using xrandr.
 """
 
+import os
+import sys
 import subprocess
 import re
 import ctypes
 import ctypes.util
 
 
+def get_ui_font():
+    """Return a path to a usable sans-serif TTF for the current OS.
+
+    Tries a list of common fonts per platform and returns the first that
+    exists. Windows ships Arial/Segoe UI; Linux commonly has Liberation or
+    DejaVu; macOS has Helvetica/Arial. Falls back to the Linux path so the
+    return value is never None.
+    """
+    candidates = [
+        # Windows
+        r"C:\Windows\Fonts\arial.ttf",
+        r"C:\Windows\Fonts\segoeui.ttf",
+        r"C:\Windows\Fonts\calibri.ttf",
+        # Linux
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        # macOS
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial.ttf",
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return candidates[3]
+
+
 def get_display_info():
+    """Detect connected displays on any OS.
+
+    Linux uses xrandr (gives gamma/brightness too). Windows and macOS use
+    GLFW, which is cross-platform and already a dependency. If the primary
+    method yields nothing, the other is tried as a fallback.
+    """
+    if sys.platform.startswith('linux'):
+        info = _get_display_info_xrandr()
+        return info if info else _get_display_info_glfw()
+    info = _get_display_info_glfw()
+    return info if info else _get_display_info_xrandr()
+
+
+def _get_display_info_glfw():
+    """Detect displays via GLFW. Works on Windows, macOS and Linux.
+
+    Provides name, resolution, position and refresh rate. Gamma and
+    brightness are not exposed by GLFW, so they stay 'unknown' (matching the
+    fields the experiment records)."""
+    try:
+        import glfw
+    except Exception as e:
+        print(f"Error getting display info (glfw import): {e}")
+        return []
+
+    if not glfw.init():
+        print("Error getting display info: glfw.init() failed")
+        return []
+
+    displays = []
+    try:
+        primary = glfw.get_primary_monitor()
+        for i, mon in enumerate(glfw.get_monitors()):
+            mode = glfw.get_video_mode(mon)
+            try:
+                px, py = glfw.get_monitor_pos(mon)
+            except Exception:
+                px, py = 0, 0
+
+            name = None
+            try:
+                name = glfw.get_monitor_name(mon)
+                if isinstance(name, bytes):
+                    name = name.decode('utf-8', 'replace')
+            except Exception:
+                pass
+
+            d = {
+                'name': name or f'Monitor {i}',
+                'primary': (mon == primary),
+                'resolution_w': mode.size.width,
+                'resolution_h': mode.size.height,
+                'pos_x': px,
+                'pos_y': py,
+                'refresh_rate': float(mode.refresh_rate),
+            }
+            try:
+                wmm, hmm = glfw.get_monitor_physical_size(mon)
+                if wmm:
+                    d['width_mm'] = wmm
+                if hmm:
+                    d['height_mm'] = hmm
+            except Exception:
+                pass
+            displays.append(d)
+    except Exception as e:
+        print(f"Error getting display info (glfw): {e}")
+
+    return displays
+
+
+def _get_display_info_xrandr():
     displays = []
 
     try:
@@ -96,6 +196,18 @@ def get_display_at_position(x, y):
 
 
 def get_mouse_display():
+    # Windows: read the cursor position via the Win32 API.
+    if sys.platform == 'win32':
+        try:
+            class _POINT(ctypes.Structure):
+                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+            pt = _POINT()
+            if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
+                return get_display_at_position(pt.x, pt.y)
+        except Exception:
+            pass
+        return 0
+
     # Query X11 cursor position directly (no window creation, no flicker)
     try:
         _xlib = ctypes.cdll.LoadLibrary(ctypes.util.find_library('X11'))

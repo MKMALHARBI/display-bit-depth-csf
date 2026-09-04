@@ -1,4 +1,4 @@
-r# Supplementary Material: 8-bit vs 10-bit Display Configuration
+# Supplementary Material: 8-bit vs 10-bit Display Configuration
 
 This document describes the computer, display, and software configuration used to
 present the experiment at **8-bit** and **10-bit** grayscale color depth. It is
@@ -121,14 +121,38 @@ hardware, resolution, and refresh rate.
 ## 6. Rendering pipeline and stimulus precision
 
 Stimuli were rendered with OpenGL 3.3 core (GLFW + PyOpenGL + FreeType;
-`lib/gl_renderer.py`). The renderer requests a 10-10-10-2 framebuffer:
+`lib/gl_renderer.py`). The renderer takes a `bits` argument selecting the
+framebuffer format explicitly — `10` for 10-10-10-2, `8` for 8-8-8-8:
 
 ```python
-glfw.window_hint(glfw.RED_BITS, 10)
-glfw.window_hint(glfw.GREEN_BITS, 10)
-glfw.window_hint(glfw.BLUE_BITS, 10)
-glfw.window_hint(glfw.ALPHA_BITS, 2)
+if bits == 10:
+    glfw.window_hint(glfw.RED_BITS, 10)
+    glfw.window_hint(glfw.GREEN_BITS, 10)
+    glfw.window_hint(glfw.BLUE_BITS, 10)
+    glfw.window_hint(glfw.ALPHA_BITS, 2)
+else:
+    glfw.window_hint(glfw.RED_BITS, 8)
+    glfw.window_hint(glfw.GREEN_BITS, 8)
+    glfw.window_hint(glfw.BLUE_BITS, 8)
+    glfw.window_hint(glfw.ALPHA_BITS, 8)
 ```
+
+`step1`–`step3` set it from the module constant `FRAMEBUFFER_BITS`;
+`luminance_test.py` in the display-measurement project sets it per mode from `MODE_BITS`.
+
+Requesting the depth rather than inheriting it from the session matters on any
+platform that grants a 10-bit framebuffer regardless of the output link depth
+(see Section 9). On a 10-bit framebuffer an 8-bit code value does not land on an
+8-bit code: `127/255` is stored as 10-bit code 509 and reads back as 126.8755,
+and only 4 of the 256 8-bit codes survive the round trip exactly. The residue is
+what a driver's output dithering then spreads across neighbouring codes, so an
+"8-bit" condition presented that way is a dithered 10-bit stimulus. Requesting
+8-8-8-8 makes the codes exact — verified by reading the framebuffer back:
+
+| framebuffer | value written | 16-bit readback | residue |
+|-------------|---------------|-----------------|---------|
+| 8-8-8-8     | 127/255       | 127.0000        | 0.0000 LSB |
+| 10-10-10-2  | 127/255       | 126.8755        | −0.1245 LSB |
 
 Gray levels were specified as floating-point values in the range 0.0–1.0 and
 written directly to the framebuffer; no temporal dithering was applied. Noise
@@ -147,9 +171,43 @@ Framebuffer: R=10 G=10 B=10 A=2 bits
   -> 10-bit rendering CONFIRMED
 ```
 
-In the 8-bit condition this line reports `R=8 G=8 B=8`. The reported framebuffer
-depth and the full display information are stored in every result file under the
-`display_calibration` field, so the actual depth used is recorded per session.
+In the 8-bit condition this line reports `R=8 G=8 B=8`. The renderer compares
+the granted depth against the requested one and warns in both directions — a
+request for 8 that is granted 10 is called out explicitly, because that is the
+silent-dithering case rather than a harmless upgrade.
+
+The reported framebuffer depth and the full display information are stored in
+every result file under `display_calibration`, and the bit-depth condition
+itself under `display_bit_depth`:
+
+| field | meaning |
+|-------|---------|
+| `framebuffer_bits_requested` | what the condition asked for |
+| `framebuffer_bits_actual` | what OpenGL granted |
+| `framebuffer_confirmed` | whether they match |
+| `lut_state` | `identity`, `inverse_gamma_2.2`, or `other`, read back from the GPU |
+| `lut_mid` | midpoint entry of the ramp, as a fingerprint |
+
+`luminance_test.py` records the same fields per CSV row, plus `output_bpc` and
+`driver_dither` entered at the start of the session (neither is readable in
+software — see Section 9).
+
+**The hardware LUT is asserted, not assumed.** The measurement tool loads a
+known ramp before measuring, verifies it by reading it back, and restores the
+previous one afterwards. Simply not applying gamma correction is not sufficient:
+that leaves whatever the last program left loaded, and a Psychtoolbox script
+exiting through its error path leaves an inverse-gamma table in the LUT
+system-wide, which would distort every subsequent reading with nothing in the
+output to indicate it.
+
+Which ramp is a startup choice (`LUT_CHOICES`):
+
+| choice | measures | use |
+|--------|----------|-----|
+| experiment gamma (2.2) — default | the stimulus as presented | matches `step1`–`step3`, which load the same table, so the readings describe what the participant sees end to end |
+| identity (raw panel) | the panel's own response | needed to derive a measured gamma table — characterising the panel through a correction derived from that panel is circular |
+
+`lut_state` in each CSV row records which was used.
 
 As an additional visual check, each program draws a 1024-level horizontal
 grayscale gradient bar (`numpy.linspace(0.0, 1.0, 1024)`) at the top of the
@@ -181,3 +239,55 @@ specification rather than measured here.
 In the 8-bit condition (Wayland session), the same chain operates at 8 bits per
 channel: the framebuffer query returns `R=8 G=8 B=8`, and the depth reported
 through XWayland is 24 planes.
+
+---
+
+## 9. Second apparatus (Windows) and why the condition is set in code
+
+Sections 1–8 describe the Ubuntu machine on which the reported data were
+collected. A second machine was subsequently used, with the same display model
+but a different host, GPU and operating system. The bit-depth manipulation does
+**not** transfer to it, which is why the framebuffer depth is now requested
+explicitly (Section 6) rather than inherited from the session.
+
+| Property | Machine A (Sections 1–8) | Machine B |
+|----------|--------------------------|-----------|
+| OS | Ubuntu 24.04.4 LTS | Windows 10 Home 19045 |
+| GPU | NVIDIA GeForce RTX 2070 | NVIDIA GeForce GTX 1650 |
+| GPU driver | 580.159.03 (proprietary) | 32.0.15.6094 |
+| Display | BenQ EX3210U | BenQ EX3210U (same model) |
+| Mode | 3840 × 2160 @ 119.88 Hz | 3840 × 2160 @ 60 Hz |
+| Python / glfw | 3.12.3 / 2.10.0 | 3.14.6 / 2.10.2 |
+| Depth selection | X11 depth 30 vs Wayland session | `FRAMEBUFFER_BITS` / `MODE_BITS` in code |
+| Output dithering | disabled (`Dithering = 0`) | on; not exposed to any API |
+
+Three differences matter for interpretation.
+
+**The framebuffer depth is not controlled by the OS setting.** On Machine B the
+driver grants a 10-10-10-2 framebuffer whether NVIDIA Control Panel → Change
+resolution → Output color depth is set to 8 bpc or 10 bpc; this was verified
+directly, windowed and fullscreen. The session-type method of Sections 4–5 has
+no Windows equivalent, and changing the driver setting alone leaves the
+framebuffer — and therefore the logged `R=10` — unchanged. The condition must
+come from `bits`.
+
+**Windows reports the 8 bpc mode as "8-bit with dithering."** With the output
+link at 8 bpc, the display engine dithers anything of higher precision down to
+8 bits rather than truncating it, so surplus precision reaches the panel as a
+spatial/temporal mixture instead of being discarded. There is no supported API
+for reading or disabling this, and no equivalent of the `Dithering = 0` setting
+used on Machine A. It is therefore recorded per session rather than controlled:
+`output_bpc` and `driver_dither` are entered at the start of a
+`luminance_test.py` run and written to every CSV row.
+
+With an 8-8-8-8 framebuffer there is no sub-8-bit information left for the
+driver to dither, so the 8-bit condition is well defined on Machine B despite
+this. The `dither` mode is the exception: its deliberate temporal dithering can
+be compounded by the driver's, and it is interpretable only with
+`driver_dither` recorded.
+
+**Refresh rate differs by a factor of two** (60 Hz vs 119.88 Hz). The temporal
+dither modes alternate codes per frame, so the duty cycle integrated by the
+photometer is not the same on the two machines. Measurements from Machine B
+should carry their own condition tag and should not be pooled with the
+Machine A CSVs without justification.

@@ -15,6 +15,11 @@ import freetype
 from OpenGL.GL import *
 from OpenGL.GL import shaders
 
+try:
+    from .gamma_correction import GammaCorrection, make_identity_table
+except ImportError:                      # running this file directly
+    from gamma_correction import GammaCorrection, make_identity_table
+
 
 # ---------------------------------------------------------------------------
 # Shader sources (OpenGL 3.3 core)
@@ -77,18 +82,71 @@ void main() {
 """
 
 
+#: Encodes the finished frame for the panel: out = in ** (1/gamma), per channel.
+#: This is the last thing that happens before the pixels leave the GPU, which is
+#: where the hardware LUT used to sit.
+_FRAG_RESOLVE = """
+#version 330 core
+in vec2 vUV;
+out vec4 FragColor;
+uniform sampler2D uTex;
+uniform vec3 uInvGamma;
+void main() {
+    vec3 lin = clamp(texture(uTex, vUV).rgb, 0.0, 1.0);
+    FragColor = vec4(pow(lin, uInvGamma), 1.0);
+}
+"""
+
+#: This panel's measured transfer exponent per channel, from the display-measurement
+#: project's data/display/20260825_232114_10bit_calibration.json - the identity-LUT
+#: session, i.e. the raw panel with no correction in the way.
+#:
+#: Per channel, not one number: blue is 0.066 below the other two, and a single
+#: exponent leaves a colour cast that grows towards the dark end.  Measured
+#: rather than the nominal 2.2, which this panel is not.
+MEASURED_GAMMA = (2.156, 2.152, 2.090)
+
+
 class GLRenderer:
     """OpenGL 3.3 core renderer with 10-bit framebuffer support."""
 
-    def __init__(self, width, height, monitor_index=0, fullscreen=True):
+    def __init__(self, width, height, monitor_index=0, fullscreen=True, gamma_correct=True,
+                 bits=10, shader_gamma=None):
+        """shader_gamma: (gR, gG, gB) to linearise in software, or None for off.
+
+        The hardware LUT does not reach the panel on this machine.  It loads,
+        Windows stores it - GetDeviceGammaRamp reads the inverse-2.2 curve back
+        for as long as the fullscreen window is up - and the emitted light is
+        unchanged: two 133-patch sessions in the display-measurement project,
+        LUT on and LUT off, fit the same gamma to within 0.001
+        (2.156/2.152/2.090 vs 2.157/2.152/2.089).  HDR is off, so the remaining
+        suspect is the 10 bpc output path bypassing the legacy GDI LUT.
+
+        Passing the measured exponents here does the correction in the GPU
+        instead, where nothing downstream can ignore it.  MEASURED_GAMMA holds
+        this panel's values; None keeps the old behaviour exactly.
+        """
         if not glfw.init():
             raise RuntimeError("Failed to initialise GLFW")
 
-        # Request 10-10-10-2 framebuffer
-        glfw.window_hint(glfw.RED_BITS, 10)
-        glfw.window_hint(glfw.GREEN_BITS, 10)
-        glfw.window_hint(glfw.BLUE_BITS, 10)
-        glfw.window_hint(glfw.ALPHA_BITS, 2)
+        # Framebuffer bit depth: 10 -> 10:10:10:2,  8 -> 8:8:8:8
+        #
+        # The 8-bit condition MUST be selected here, not left to the OS.  Windows
+        # grants a 10-bit framebuffer whatever the driver's output depth is, and
+        # then dithers the surplus bits away at scanout - so an "8-bit" run on a
+        # 10-bit framebuffer is really a dithered 10-bit stimulus.  Asking for
+        # 8:8:8:8 leaves no sub-8-bit information for the driver to dither.
+        self.bits_requested = bits
+        if bits == 10:
+            glfw.window_hint(glfw.RED_BITS, 10)
+            glfw.window_hint(glfw.GREEN_BITS, 10)
+            glfw.window_hint(glfw.BLUE_BITS, 10)
+            glfw.window_hint(glfw.ALPHA_BITS, 2)
+        else:
+            glfw.window_hint(glfw.RED_BITS, 8)
+            glfw.window_hint(glfw.GREEN_BITS, 8)
+            glfw.window_hint(glfw.BLUE_BITS, 8)
+            glfw.window_hint(glfw.ALPHA_BITS, 8)
 
         # OpenGL 3.3 core
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -111,6 +169,23 @@ class GLRenderer:
 
         glfw.make_context_current(self._window)
         glfw.swap_interval(1)  # vsync
+
+        # Gamma correction, as in the MATLAB scripts:
+        #     oldGammaTable = Screen('ReadNormalizedGammaTable', winPtr);
+        #     Screen('LoadNormalizedGammaTable', winPtr, myGammaTableApprox);
+        # Loads the inverse-gamma (2.2) table into this monitor's hardware LUT so
+        # emitted luminance is linear in the gray values the experiment asks for.
+        # Restored in destroy().  Pass gamma_correct=False to measure the raw
+        # display instead.
+        self.monitor = monitor
+        self.gamma = None
+        if gamma_correct:
+            # gamma_correct='identity' loads a do-nothing ramp instead.  That is
+            # NOT the same as False: False leaves whatever the last program left
+            # in the LUT, which the measurement tools must never inherit.
+            table = make_identity_table() if gamma_correct == 'identity' else None
+            self.gamma = GammaCorrection(monitor, table=table)
+            self.gamma.apply()
 
         # Use actual framebuffer size (may differ from requested in windowed mode)
         fb_w, fb_h = glfw.get_framebuffer_size(self._window)
@@ -149,6 +224,19 @@ class GLRenderer:
         glDisable(GL_DEPTH_TEST)
         glViewport(0, 0, self.width, self.height)
 
+        # Software linearisation, if asked for.  Everything is drawn into a
+        # float texture and encoded in one pass at flip(), NOT inside each
+        # fragment shader: blending happens in the framebuffer, after the
+        # shader, so encoding per-shader would blend already-encoded values.
+        # With the hardware LUT the encode came after blending, and the
+        # experiments' contrasts are defined on that basis - a noise field and
+        # an additively blended letter both depend on it.  One resolve pass
+        # keeps that order.
+        self.shader_gamma = tuple(shader_gamma) if shader_gamma else None
+        self._fbo = self._fbo_tex = self._prog_resolve = None
+        if self.shader_gamma:
+            self._init_resolve_target()
+
         # Hide cursor
         glfw.set_input_mode(self._window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 
@@ -178,11 +266,20 @@ class GLRenderer:
         self.fb_green_bits = g.value
         self.fb_blue_bits = b.value
         self.fb_alpha_bits = a.value
-        print(f"Framebuffer: R={r.value} G={g.value} B={b.value} A={a.value} bits")
-        if r.value >= 10:
-            print("  -> 10-bit rendering CONFIRMED")
+        print(f"Framebuffer: R={r.value} G={g.value} B={b.value} A={a.value} bits "
+              f"(requested {self.bits_requested})")
+        self.bits_confirmed = (r.value == self.bits_requested)
+        if self.bits_confirmed:
+            print(f"  -> {self.bits_requested}-bit rendering CONFIRMED")
+        elif r.value < self.bits_requested:
+            print(f"  -> WARNING: {self.bits_requested}-bit not available, "
+                  f"got {r.value}-bit fallback")
         else:
-            print("  -> WARNING: 10-bit not available, got 8-bit fallback")
+            # Asked for 8 and got 10: the surplus bits will be dithered away at
+            # scanout, so this is NOT an 8-bit condition.  Loud on purpose.
+            print(f"  -> WARNING: asked for {self.bits_requested}-bit but got "
+                  f"{r.value}-bit. The driver will dither the extra bits; this "
+                  f"is a dithered {r.value}-bit stimulus, not {self.bits_requested}-bit.")
 
     # ------------------------------------------------------------------
     # Shader compilation
@@ -289,7 +386,12 @@ class GLRenderer:
 
     def flip(self):
         """Swap buffers (present frame). Blocks until vsync."""
+        if self._fbo is not None:
+            self._resolve()
         glfw.swap_buffers(self._window)
+        if self._fbo is not None:
+            # Next frame goes back into the offscreen buffer.
+            glBindFramebuffer(GL_FRAMEBUFFER, self._fbo)
 
     # ------------------------------------------------------------------
     # FreeType text rendering
@@ -457,11 +559,76 @@ class GLRenderer:
     # Input handling
     # ------------------------------------------------------------------
 
+    def _init_resolve_target(self):
+        """Offscreen colour buffer the frame is drawn into, plus its shader.
+
+        RGBA16F, not RGB10_A2: the encode reads this buffer back, and at 10 bits
+        the round trip would quantise twice - once here, once at the default
+        framebuffer - throwing away the sub-code precision the whole 10-bit
+        pipeline exists to deliver.  Half floats have 10 explicit mantissa bits
+        plus an exponent, so values near the dark end keep more resolution than
+        the panel can show.
+        """
+        self._prog_resolve = shaders.compileProgram(
+            shaders.compileShader(_VERT_SRC, GL_VERTEX_SHADER),
+            shaders.compileShader(_FRAG_RESOLVE, GL_FRAGMENT_SHADER))
+
+        self._fbo = glGenFramebuffers(1)
+        self._fbo_tex = glGenTextures(1)
+        self._resize_resolve_target()
+
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            raise RuntimeError("shader gamma: framebuffer incomplete (0x%x)" % status)
+        print("Shader gamma: linearising in the GPU, gamma = %.3f/%.3f/%.3f"
+              % self.shader_gamma)
+
+        # Draw the first frame into the texture, not the window.
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fbo)
+
+    def _resize_resolve_target(self):
+        """(Re)allocate the offscreen texture at the current framebuffer size."""
+        glBindTexture(GL_TEXTURE_2D, self._fbo_tex)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, self.width, self.height, 0,
+                     GL_RGBA, GL_FLOAT, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, self._fbo)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_2D, self._fbo_tex, 0)
+
+    def _resolve(self):
+        """Encode the offscreen frame into the window's framebuffer."""
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glViewport(0, 0, self.width, self.height)
+        # Blending off: this pass replaces the frame, it does not mix with it.
+        glDisable(GL_BLEND)
+        glUseProgram(self._prog_resolve)
+        glUniform2f(glGetUniformLocation(self._prog_resolve, "uResolution"),
+                    self.width, self.height)
+        glUniform3f(glGetUniformLocation(self._prog_resolve, "uInvGamma"),
+                    1.0 / self.shader_gamma[0], 1.0 / self.shader_gamma[1],
+                    1.0 / self.shader_gamma[2])
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self._fbo_tex)
+        glUniform1i(glGetUniformLocation(self._prog_resolve, "uTex"), 0)
+        # v flipped: _upload_quad's UVs assume a top-left origin, the texture
+        # has a bottom-left one, and an unflipped quad renders upside down.
+        self._upload_quad(0, 0, self.width, self.height, 0.0, 1.0, 1.0, 0.0)
+        self._draw_quad()
+        glEnable(GL_BLEND)
+
     def _framebuffer_size_callback(self, window, w, h):
         """Update viewport and dimensions when window is resized."""
         self.width = w
         self.height = h
         glViewport(0, 0, w, h)
+        if self._fbo is not None:
+            self._resize_resolve_target()
 
     def _key_callback(self, window, key, scancode, action, mods):
         if action == glfw.PRESS:
@@ -567,6 +734,15 @@ class GLRenderer:
         glDeleteProgram(self._prog_color)
         glDeleteProgram(self._prog_noise)
 
+        if self._fbo is not None:
+            glDeleteFramebuffers(1, [self._fbo])
+            glDeleteTextures(1, [self._fbo_tex])
+            glDeleteProgram(self._prog_resolve)
+
+        # MATLAB: Screen('LoadNormalizedGammaTable', winPtr, oldGammaTable);
+        if getattr(self, 'gamma', None) is not None:
+            self.gamma.restore()
+
         glfw.destroy_window(self._window)
         glfw.terminate()
 
@@ -577,6 +753,7 @@ class GLRenderer:
 
 if __name__ == "__main__":
     import sys
+    import os
 
     print("GLRenderer standalone test")
     print("Press ESC to exit\n")
@@ -584,7 +761,15 @@ if __name__ == "__main__":
     W, H = 800, 600
     renderer = GLRenderer(W, H, fullscreen=False)
 
-    font_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    _font_candidates = [
+        r"C:\Windows\Fonts\arial.ttf",
+        r"C:\Windows\Fonts\segoeui.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+    ]
+    font_path = next((p for p in _font_candidates if os.path.isfile(p)),
+                     _font_candidates[2])
     renderer.load_font(font_path, 48)
 
     frame = 0
