@@ -2,3 +2,12 @@
 __pycache__/
 *.pyc
 .idea/
+SubjSeedinfo.txt
+fonts/
+old code/Data/
+old data/SubjSeedinfo.txt
+old data/Emulated_Data/*/
+!old data/Emulated_Data/Mo_*/
+old data/FG_*/
+old data/OK*/
+Data/
