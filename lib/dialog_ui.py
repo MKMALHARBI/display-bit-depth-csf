@@ -132,8 +132,35 @@ ACCENT = "#2563eb"      # section titles, primary button
 ACCENT_DARK = "#1d4ed8"
 FONT = "Segoe UI"
 
+# Shown in the header of every participant dialog.
+RESEARCHERS = ["Dr Mo Alharbi", "Dr Pratik Raul"]
+LOGO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "logos")
+LOGO_FILES = ["university_of_canberra.png", "taif_university.png"]
+LOGO_HEIGHT_PT = 54     # logo height in points (scales with the screen like the text)
+
 FIELD_CHARS = 24        # width of every input, in characters
 COL_GAP = 12            # half the gap between the two columns
+
+
+def load_logos(root):
+    """Logo images scaled for this screen. Returns [] if Pillow or the files are missing."""
+    try:
+        from PIL import Image, ImageTk
+    except ImportError:
+        return []
+    height_px = max(24, int(round(root.winfo_fpixels(f"{LOGO_HEIGHT_PT}p"))))
+    logos = []
+    for name in LOGO_FILES:
+        path = os.path.join(LOGO_DIR, name)
+        if not os.path.exists(path):
+            continue
+        try:
+            image = Image.open(path).convert("RGB")
+            width_px = max(1, int(round(image.width * height_px / image.height)))
+            logos.append(ImageTk.PhotoImage(image.resize((width_px, height_px), Image.LANCZOS), master=root))
+        except Exception:
+            continue
+    return logos
 
 
 class ParticipantDialog:
@@ -157,8 +184,9 @@ class ParticipantDialog:
         style = ttk.Style()
         style.configure("Page.TFrame", background=PAGE)
         style.configure("Card.TFrame", background=CARD)
-        style.configure("Title.TLabel", background=PAGE, foreground=TEXT, font=(FONT, 18, "bold"))
-        style.configure("Sub.TLabel", background=PAGE, foreground=MUTED, font=label_font)
+        style.configure("Title.TLabel", background=CARD, foreground=TEXT, font=(FONT, 18, "bold"))
+        style.configure("Sub.TLabel", background=CARD, foreground=MUTED, font=label_font)
+        style.configure("Names.TLabel", background=CARD, foreground=TEXT, font=(FONT, 11, "bold"))
         style.configure("Section.TLabel", background=CARD, foreground=ACCENT, font=(FONT, 12, "bold"))
         style.configure("Field.TLabel", background=CARD, foreground=MUTED, font=label_font)
         style.configure("Hint.TLabel", background=CARD, foreground=MUTED, font=(FONT, 10))
@@ -168,9 +196,26 @@ class ParticipantDialog:
 
         self.page = ttk.Frame(root, padding=(28, 22, 28, 22), style="Page.TFrame")
         self.page.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(self.page, text=title, style="Title.TLabel").pack(anchor="w")
+        # Header: title and researchers on the left, logos on the right.
+        header_outline = tk.Frame(self.page, bg=BORDER)
+        header_outline.pack(fill="x")
+        header = ttk.Frame(header_outline, padding=(20, 14, 20, 14), style="Card.TFrame")
+        header.pack(fill="both", expand=True, padx=1, pady=1)
+
+        logo_frame = ttk.Frame(header, style="Card.TFrame")
+        logo_frame.pack(side=tk.RIGHT, anchor="center")
+        self.logo_images = load_logos(root)   # keep a reference so they are not garbage-collected
+        for logo in self.logo_images:
+            tk.Label(logo_frame, image=logo, bg=CARD, bd=0).pack(side=tk.LEFT, padx=(16, 0))
+
+        text_frame = ttk.Frame(header, style="Card.TFrame")
+        text_frame.pack(side=tk.LEFT, anchor="w")
+        ttk.Label(text_frame, text=title, style="Title.TLabel").pack(anchor="w")
         if subtitle:
-            ttk.Label(self.page, text=subtitle, style="Sub.TLabel").pack(anchor="w")
+            ttk.Label(text_frame, text=subtitle, style="Sub.TLabel").pack(anchor="w")
+        if RESEARCHERS:
+            ttk.Label(text_frame, text="   |   ".join(RESEARCHERS), style="Names.TLabel").pack(
+                anchor="w", pady=(8, 0))
 
     # -- layout ----------------------------------------------------------
 
