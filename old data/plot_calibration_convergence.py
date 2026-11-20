@@ -38,7 +38,7 @@ CONVERGENCE_TOLERANCE = 0.10  # |p_emp - 0.75| <= tol --> "converged"
 COD_DIR = os.path.join(os.path.dirname(ANALYSIS_DIR), "Emulated_Data")
 OLD_DIR = os.path.join(os.path.dirname(ANALYSIS_DIR), "old data")
 GROUP_FOLDERS = {
-    'COD (Mo)': (COD_DIR, ['Mo_8bit', 'Mo_10bit']),
+    'COD (P003)': (COD_DIR, ['P003_8bit', 'P003_10bit']),
     'CO':       (OLD_DIR, ['COTest_8bit', 'COTest_10bit']),
     'NH':       (OLD_DIR, ['NHTest_8bit', 'NHTest_10bit']),
 }
@@ -242,7 +242,7 @@ def main():
 
 
 def plot_groups():
-    """3-panel comparison: COD (Mo) vs CO vs NH calibration trajectories."""
+    """3-panel comparison: COD (P003) vs CO vs NH calibration trajectories."""
     group_sessions = {
         name: load_calibration_from_folders(base, folders)
         for name, (base, folders) in GROUP_FOLDERS.items()

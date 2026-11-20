@@ -10,6 +10,7 @@ Temporal dithering removed — true 10-bit precision (1024 gray levels).
 """
 
 import numpy as np
+import glob
 import json
 import os
 import random
@@ -18,7 +19,9 @@ import glfw
 from datetime import datetime
 
 from lib.parameters import params, paths, fonts
-from lib.exp_dialog import framebuffer_bits, get_participant_info, create_data_folder, save_participant_info
+from lib.exp_dialog import (framebuffer_bits, get_participant_info, create_data_folder,
+                            save_participant_info, session_folder_name)
+from lib.dialog_ui import move_aside_participant_data
 from lib.display_utils import DisplayCalibration, print_all_displays, setup_display_for_glfw
 from lib.gl_renderer import GLRenderer
 from lib.gamma_correction import ramp_fingerprint, GAMMA_POWER
@@ -116,6 +119,64 @@ class SimpleQUEST:
         return np.sqrt(np.sum(self.pdf * (self.x - mean) ** 2))
 
 
+def reuse_last_calibration(info, data_folder, replaced_folder=None):
+    """Skip QUEST: copy the last recorded threshold into this session's folder.
+
+    Uses this participant's own most recent calibration if there is one,
+    otherwise the most recent calibration recorded for anyone - in both cases
+    preferring one measured at this session's bit depth. The copy is a new
+    *_calibration_reused_threshold.json marked as reused: steps 2 and 3 pick it
+    up as usual, while the analysis scripts (which read
+    *_calibration_threshold.json) do not count it as a measured threshold.
+    Returns True if a calibration was found and copied.
+    """
+    data_root = os.path.join(paths['base_dir'], "Data")
+    bit_tag = os.path.basename(data_folder).rsplit('_', 1)[-1]   # '10bit' / '8bit'
+
+    def thresholds(folders):
+        return [f for folder in folders
+                for f in glob.glob(os.path.join(glob.escape(folder), "*_threshold.json"))]
+
+    def session_folders(name_pattern, tag_pattern):
+        return glob.glob(os.path.join(glob.escape(data_root), f"{name_pattern}_{tag_pattern}"))
+
+    # Rerun: the participant's earlier session at this depth was just moved aside.
+    own_same = thresholds([data_folder] + ([replaced_folder] if replaced_folder else []))
+    own_any = thresholds(session_folders(glob.escape(info['name']), "*bit"))
+    # Quick-test sessions (Test_...) are not valid calibrations for anyone else.
+    others = [d for d in session_folders("*", "*bit")
+              if info['name'].startswith("Test_") or not os.path.basename(d).startswith("Test_")]
+    anyone_same = thresholds([d for d in others if d.endswith("_" + bit_tag)])
+    anyone = thresholds(others)
+
+    candidates = own_same or own_any or anyone_same or anyone
+    if not candidates:
+        return False
+    source = max(candidates, key=os.path.getmtime)
+    with open(source, 'r') as f:
+        threshold_data = json.load(f)
+
+    source_bits = (threshold_data.get('participant') or {}).get('bit_depth')
+    threshold_data['reused_calibration'] = True
+    threshold_data['reused_from'] = os.path.relpath(source, paths['base_dir'])
+    threshold_data['reused_from_same_participant'] = bool(own_same or own_any)
+    threshold_data['reused_from_bit_depth'] = source_bits
+    threshold_data['reused_at'] = datetime.now().isoformat()
+
+    target = os.path.join(
+        data_folder, f"{info['name']}_{info['timestamp']}_calibration_reused_threshold.json")
+    with open(target, 'w') as f:
+        json.dump(threshold_data, f, indent=2)
+
+    whose = "this participant's own" if (own_same or own_any) else "ANOTHER participant's"
+    print(f"CALIBRATION SKIPPED - reusing {whose} last calibration:")
+    print(f"  from: {source}")
+    print(f"  measured at: {source_bits} (this session: {info.get('bit_depth')})")
+    print(f"  threshold_linear = {threshold_data['threshold_linear']:.6f}")
+    print(f"  saved to: {target}")
+    return True
+
+
 def run_quest_calibration():
     print("=" * 60)
     print("STEP 1 — QUEST THRESHOLD CALIBRATION")
@@ -136,11 +197,25 @@ def run_quest_calibration():
     random.seed(info['random_seed'])
     np.random.seed(info['random_seed'])
 
+    # Rerun of a session this participant already did at this bit depth: the
+    # old Data/<name>_<depth> folder is moved out of Data/ so this session
+    # replaces it. Their other bit depth is left where it is.
+    replaced_folder = None
+    if info.get('rerun', False):
+        replaced_folder = move_aside_participant_data(
+            paths['base_dir'], session_folder_name(info), info['timestamp'])
+
     data_folder = create_data_folder(info, base_dir=paths['base_dir'])
     print(f"Data folder: {data_folder}")
 
     # Save participant info for steps 2 and 3
     save_participant_info(info, data_folder)
+
+    # Optional shortcut from the dialog: reuse the last recorded calibration.
+    if info.get('skip_calibration', False):
+        if reuse_last_calibration(info, data_folder, replaced_folder):
+            return
+        print("No earlier calibration found - running the calibration now.")
 
     display_cal = DisplayCalibration(DISPLAY_INDEX)
     display_cal.print_report()
@@ -202,6 +277,11 @@ def run_quest_calibration():
     # QUEST eters
     quest_letters = params['quest_letters']
     trials_per_block = params['quest_trials']
+    if info.get('quick_test', False):
+        # Quick Test: only a fraction of the trials. The threshold from so few
+        # trials is NOT a valid calibration - for checking the pipeline only.
+        trials_per_block = max(1, round(trials_per_block * params['quick_test_fraction']))
+        print(f"QUICK TEST: {trials_per_block} trials per block")
 
     all_thresholds = []
     all_sds = []

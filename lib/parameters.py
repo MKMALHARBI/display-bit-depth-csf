@@ -119,6 +119,7 @@ params = {
     'stim_duration': 1.0,
     'quest_letters': ['C', 'O', 'D'],  # MATLAB: ['H', 'N']
     'quest_trials': 40,
+    'quick_test_fraction': 0.10,  # Quick Test runs this share of the trials
 }
 
 fonts = {

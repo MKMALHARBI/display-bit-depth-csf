@@ -29,8 +29,8 @@ plt.rcParams.update({
 
 # Folders holding the noise-staircase ("plain" SR_Binocular) sessions.
 NOISE_FOLDERS = {
-    '8bit':  ['FG_8bit', 'Mo_8bit', 'OK8_8bit'],
-    '10bit': ['FG_10bit', 'Mo_10bit', 'OK_10bit'],
+    '8bit':  ['P004_8bit', 'P003_8bit', 'P002_8bit'],
+    '10bit': ['P004_10bit', 'P003_10bit', 'P001_10bit'],
 }
 BIT_COLORS = {'8bit': '#0072B2', '10bit': '#D55E00'}
 CHANCE = 0.1

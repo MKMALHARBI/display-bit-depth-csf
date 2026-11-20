@@ -204,6 +204,11 @@ def run_main_experiment():
                     'noise_level': noise
                 })
     rng.shuffle(trials_block1)
+    if info.get('quick_test', False):
+        # Quick Test: keep a random fraction of the shuffled trial list.
+        n_quick = max(1, round(len(trials_block1) * params['quick_test_fraction']))
+        trials_block1 = trials_block1[:n_quick]
+        print(f"QUICK TEST: {n_quick} trials")
     n_trials = len(trials_block1)
 
     # Generate trial seeds for reproducibility across blocks

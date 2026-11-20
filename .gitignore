@@ -7,7 +7,16 @@ fonts/
 old code/Data/
 old data/SubjSeedinfo.txt
 old data/Emulated_Data/*/
-!old data/Emulated_Data/Mo_*/
 old data/FG_*/
 old data/OK*/
 Data/
+
+# Participant renaming: the key links old names to P-numbers - never commit it
+participant_key.csv
+Data_replaced/
+
+# Human data stays off GitHub: code only
+old data/*_10bit/
+old data/*_8bit/
+old data/Emulated_Data/
+demographics.md

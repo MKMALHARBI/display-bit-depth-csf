@@ -16,7 +16,7 @@ from plot_results import (
 
 
 GROUP_FOLDERS = {
-    'COD': ['Mo_8bit', 'Mo_10bit'],
+    'COD': ['P003_8bit', 'P003_10bit'],
     'CO':  ['COTest_8bit', 'COTest_10bit'],
     'NH':  ['NHTest_8bit', 'NHTest_10bit'],
 }
